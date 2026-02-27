@@ -42,8 +42,9 @@ checksum:
 signs:
   - artifacts: checksum
     args:
+      - "--batch"
       - "--passphrase"
-      - ""
+      - "{{ .Env.PASSPHRASE }}"
       - "--pinentry-mode"
       - "loopback"
       - "--local-user"
