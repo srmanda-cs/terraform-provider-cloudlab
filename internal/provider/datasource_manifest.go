@@ -86,10 +86,21 @@ type rspecIP struct {
 }
 
 // parseRSpecNodes parses node information from a raw RSpec XML string.
+// Returns nil if the XML cannot be decoded; the caller should check for an empty
+// result and use the context-aware variant parseRSpecNodesCtx when possible.
 func parseRSpecNodes(rspecXMLStr string) []manifestNodeModel {
+	nodes, _ := decodeRSpecNodes(context.Background(), rspecXMLStr)
+	return nodes
+}
+
+// decodeRSpecNodes parses node information from a raw RSpec XML string and
+// logs a warning via tflog when parsing fails, preserving the calling context.
+func decodeRSpecNodes(ctx context.Context, rspecXMLStr string) ([]manifestNodeModel, error) {
 	var rspec rspecXML
 	if err := xml.NewDecoder(strings.NewReader(rspecXMLStr)).Decode(&rspec); err != nil {
-		return nil
+		tflog.Warn(ctx, "Failed to parse RSpec XML manifest; node list will be empty",
+			map[string]any{"error": err.Error()})
+		return nil, err
 	}
 
 	var nodes []manifestNodeModel
@@ -125,7 +136,7 @@ func parseRSpecNodes(rspecXMLStr string) []manifestNodeModel {
 
 		nodes = append(nodes, node)
 	}
-	return nodes
+	return nodes, nil
 }
 
 // Metadata returns the data source type name.
@@ -231,9 +242,10 @@ func (d *manifestDataSource) Read(ctx context.Context, req datasource.ReadReques
 
 	var manifestModels []manifestEntryModel
 	for urn, rspecXMLStr := range rawManifests {
+		nodes, _ := decodeRSpecNodes(ctx, rspecXMLStr)
 		entry := manifestEntryModel{
 			Aggregate: types.StringValue(urn),
-			Nodes:     parseRSpecNodes(rspecXMLStr),
+			Nodes:     nodes,
 		}
 		manifestModels = append(manifestModels, entry)
 	}
