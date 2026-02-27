@@ -89,4 +89,12 @@ When `wait_for_complete = true` (the default), the provider polls every **15 sec
 
 ## Import
 
-Snapshots cannot be imported using this resource. Use the `status` output from a previous apply instead.
+Snapshots can be imported using a composite ID of the form `<experiment_uuid>/<snapshot_uuid>`:
+
+```shell
+terraform import cloudlab_snapshot.my_image <experiment-uuid>/<snapshot-uuid>
+```
+
+Both UUIDs are required because the CloudLab API needs the experiment ID to look up snapshot status. The snapshot UUID is the value of the `id` attribute on the resource.
+
+**Note:** Importing a snapshot does not re-create the image. It only brings an existing snapshot request into Terraform state so its status can be tracked.
