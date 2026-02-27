@@ -13,7 +13,7 @@ import (
 
 const (
 	defaultPortalURL = "https://boss.emulab.net:43794"
-	apiBasePath      = "/portal/api"
+	apiBasePath      = ""
 
 	// Poll intervals for experiment readiness.
 	pollInterval = 15 * time.Second
@@ -362,19 +362,30 @@ func (e *APIError) Error() string {
 // ---------------------------------------------------------------------------
 
 func (c *Client) doRequest(method, path string, body any) ([]byte, error) {
+	var bodyBytes []byte
 	var reqBody io.Reader
 	if body != nil {
 		data, err := json.Marshal(body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal request body: %w", err)
 		}
-		reqBody = bytes.NewBuffer(data)
+		bodyBytes = data
+		reqBody = bytes.NewReader(bodyBytes)
 	}
 
-	url := c.portalURL + apiBasePath + path
+	url := c.portalURL + path
 	req, err := http.NewRequest(method, url, reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	// Set GetBody so Go's http.Client can re-send the body on 307/308 redirects.
+	// The CloudLab API server (uvicorn) redirects /foo to /foo/ and 307 redirects
+	// require the original method and body to be preserved.
+	if bodyBytes != nil {
+		snapshot := bodyBytes
+		req.GetBody = func() (io.ReadCloser, error) {
+			return io.NopCloser(bytes.NewReader(snapshot)), nil
+		}
 	}
 
 	req.Header.Set("X-Api-Token", c.token)

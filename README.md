@@ -23,13 +23,14 @@ terraform {
   required_providers {
     cloudlab = {
       source  = "srmanda-cs/cloudlab"
-      version = "~> 0.1"
+      version = "~> 0.2"
     }
   }
 }
 
 provider "cloudlab" {
   token = var.cloudlab_token
+  # portal_url defaults to https://boss.emulab.net:43794 (the CloudLab Portal REST API)
 }
 
 # Create a profile (topology template)

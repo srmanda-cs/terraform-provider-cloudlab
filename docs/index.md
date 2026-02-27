@@ -85,7 +85,7 @@ output "node_hostnames" {
 
 ### Optional
 
-- `portal_url` (String) — CloudLab portal base URL. Defaults to `https://www.cloudlab.us`. Can also be set via the `CLOUDLAB_PORTAL_URL` environment variable. Override this to use a different CloudLab instance (e.g., Emulab, Powder).
+- `portal_url` (String) — CloudLab portal REST API base URL. Defaults to `https://boss.emulab.net:43794` (the CloudLab/Emulab Portal API server). Can also be set via the `CLOUDLAB_PORTAL_URL` environment variable. Override this to target a different portal instance.
 
 ## Resources
 
