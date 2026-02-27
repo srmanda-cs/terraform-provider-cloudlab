@@ -21,6 +21,7 @@ const (
 )
 
 // Experiment status strings returned by the Portal API.
+// WaitForExperiment polls through any intermediate state until "ready" or "failed".
 const (
 	StatusReady  = "ready"
 	StatusFailed = "failed"
