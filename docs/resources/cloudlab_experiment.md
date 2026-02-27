@@ -1,16 +1,20 @@
 ---
 page_title: "cloudlab_experiment Resource - terraform-provider-cloudlab"
 description: |-
-  Manages a CloudLab experiment. Creating an experiment provisions physical or virtual machines on CloudLab.
+  Manages a CloudLab experiment. Creating an experiment provisions physical or virtual machines on the CloudLab testbed.
 ---
 
 # cloudlab_experiment (Resource)
 
-Manages a CloudLab experiment. Creating an experiment provisions physical or virtual machines on the CloudLab testbed using a specified profile (topology template). Deleting the experiment terminates and releases all associated resources.
+Manages a CloudLab experiment. In CloudLab terminology, an "experiment" is a running instantiation of a profile — it represents actual allocated hardware (or VMs) with assigned IP addresses and hostnames.
 
-In CloudLab terminology, an "experiment" is a running instantiation of a profile — it represents actual allocated hardware (or VMs) with assigned IP addresses and hostnames.
+Creating this resource calls `POST /experiments` and (by default) waits up to 30 minutes for the experiment to reach `ready` status. Deleting the resource terminates the experiment and releases all associated hardware.
+
+**Mutable without replacement:** `expires_at` (extend lifetime), `extend_reason`, and `bindings`. All other configuration attributes require destroying and recreating the experiment.
 
 ## Example Usage
+
+### Basic experiment using a public profile
 
 ```terraform
 resource "cloudlab_experiment" "cluster" {
@@ -24,9 +28,13 @@ resource "cloudlab_experiment" "cluster" {
 output "experiment_id" {
   value = cloudlab_experiment.cluster.id
 }
+
+output "experiment_status" {
+  value = cloudlab_experiment.cluster.status
+}
 ```
 
-### Full example with custom profile
+### Experiment from a custom profile with parameter bindings
 
 ```terraform
 resource "cloudlab_profile" "topology" {
@@ -41,6 +49,87 @@ resource "cloudlab_experiment" "run" {
   profile_name    = cloudlab_profile.topology.name
   profile_project = cloudlab_profile.topology.project
   duration        = 48
+
+  # Pass parameter bindings to parameterized profiles
+  bindings = jsonencode({
+    n_nodes    = 4
+    node_type  = "xl170"
+  })
+}
+```
+
+### Scheduled experiment with SSH key injection
+
+```terraform
+resource "cloudlab_experiment" "scheduled" {
+  name            = "nightly-run"
+  project         = "MyProject"
+  profile_name    = "test-profile"
+  profile_project = "MyProject"
+  start_at        = "2026-03-01T02:00:00Z"
+  stop_at         = "2026-03-01T08:00:00Z"
+  sshpubkey       = file("~/.ssh/id_ed25519.pub")
+  wait_for_ready  = false
+}
+```
+
+### Extending an experiment's lifetime
+
+```terraform
+resource "cloudlab_experiment" "cluster" {
+  name            = "my-cluster"
+  project         = "MyProject"
+  profile_name    = "small-lan"
+  profile_project = "CloudLab"
+  duration        = 24
+  expires_at      = "2026-04-01T00:00:00Z"
+  extend_reason   = "Need more time for data collection"
+}
+```
+
+### Using a repository-backed profile with a specific refspec
+
+```terraform
+resource "cloudlab_experiment" "from_branch" {
+  name            = "feature-test"
+  project         = "MyProject"
+  profile_name    = "my-repo-profile"
+  profile_project = "MyProject"
+  refspec         = "refs/heads/feature-branch"
+  duration        = 12
+}
+```
+
+### Retrieve node details after creation
+
+```terraform
+resource "cloudlab_experiment" "cluster" {
+  name            = "my-cluster"
+  project         = "MyProject"
+  profile_name    = "small-lan"
+  profile_project = "CloudLab"
+}
+
+# Get all node hostnames via the manifest data source
+data "cloudlab_manifest" "nodes" {
+  experiment_id = cloudlab_experiment.cluster.id
+}
+
+output "hostnames" {
+  value = flatten([
+    for m in data.cloudlab_manifest.nodes.manifests :
+    [for n in m.nodes : n.hostname]
+  ])
+}
+
+# Or look up a specific node
+data "cloudlab_node" "node1" {
+  experiment_id = cloudlab_experiment.cluster.id
+  client_id     = "node1"
+}
+
+output "node1_ipv4" {
+  value = data.cloudlab_node.node1.ipv4
 }
 ```
 
@@ -48,29 +137,44 @@ resource "cloudlab_experiment" "run" {
 
 ### Required
 
-- `name` (String) — A human-readable name for the experiment. Must be unique within the project.
-- `project` (String) — The CloudLab project to instantiate the experiment in.
-- `profile_name` (String) — The name of the profile (topology template) used to create the experiment.
-- `profile_project` (String) — The project that owns the profile.
+- `name` (String) — A human-readable name for the experiment. Must be unique within the project. **Forces new resource.**
+- `project` (String) — The CloudLab project to instantiate the experiment in. **Forces new resource.**
+- `profile_name` (String) — The name of the profile (topology template) used to create the experiment. **Forces new resource.**
+- `profile_project` (String) — The project that owns the profile. **Forces new resource.**
 
 ### Optional
 
-- `duration` (Number) — Initial experiment duration in hours.
-- `start_at` (String) — Schedule the experiment to start at a future time (RFC3339 format).
-- `stop_at` (String) — Schedule the experiment to stop at a future time (RFC3339 format).
-- `wait_for_ready` (Boolean) — If `true` (default), Terraform will wait until the experiment reaches `ready` status before completing. Set to `false` to return immediately after creation is submitted.
+- `group` (String) — The project subgroup to instantiate the experiment in. **Forces new resource.**
+- `duration` (Number) — Initial experiment duration in hours. **Forces new resource.**
+- `start_at` (String) — Schedule the experiment to start at a future time (RFC3339 format). **Forces new resource.**
+- `stop_at` (String) — Schedule the experiment to stop at a future time (RFC3339 format). **Forces new resource.**
+- `paramset_name` (String) — Name of a saved parameter set to apply to the profile. **Forces new resource.**
+- `paramset_owner` (String) — The owner (username) of the parameter set. **Forces new resource.**
+- `bindings` (String) — JSON-encoded parameter bindings to apply to the profile. Mutable: changing this value performs a `PATCH /experiments/{id}` to apply new bindings to the running experiment.
+- `refspec` (String) — For repository-backed profiles, optionally specify a `refspec[:hash]` to use instead of the HEAD of the default branch. **Forces new resource.**
+- `sshpubkey` (String) — An additional SSH public key to install on all nodes in the experiment. **Forces new resource.**
+- `expires_at` (String) — The time the experiment should expire (RFC3339 format). Setting or changing this value performs a `PUT /experiments/{id}` to extend (or set) the expiration. Can only be moved later, not earlier, once the experiment is running.
+- `extend_reason` (String) — Optional reason text to include when extending the experiment's lifetime via `expires_at`.
+- `wait_for_ready` (Boolean) — If `true` (default), Terraform blocks until the experiment reaches `ready` status before completing the `apply`. Set to `false` to return immediately after the create request is submitted. The provider polls every 15 seconds with a 30-minute timeout.
 
 ### Read-Only
 
 - `id` (String) — The unique identifier (UUID) of the experiment assigned by CloudLab.
 - `creator` (String) — The CloudLab username who created the experiment.
+- `updater` (String) — The CloudLab username who last updated the experiment (nullable).
 - `status` (String) — The current status of the experiment (e.g., `created`, `ready`, `failed`).
-- `created_at` (String) — The timestamp when the experiment was created.
-- `expires_at` (String) — The timestamp when the experiment is scheduled to expire.
+- `created_at` (String) — The timestamp when the experiment was created (ISO 8601).
+- `started_at` (String) — The timestamp when the experiment was actually started (ISO 8601, nullable).
+- `expires_at` (String) — The current expiration time of the experiment (ISO 8601, nullable). Also writable — see above.
+- `url` (String) — The URL of the Portal status page for this experiment.
+- `wbstore_id` (String) — The ID of the experiment's WB store (internal CloudLab identifier).
+- `repository_url` (String) — The repository URL (for repository-backed profiles, nullable).
+- `repository_refspec` (String) — The refspec used for the experiment (for repository-backed profiles, nullable).
+- `repository_hash` (String) — The commit hash used for the experiment (for repository-backed profiles, nullable).
 
 ## Timeouts
 
-When `wait_for_ready` is `true`, the provider polls for experiment readiness every 15 seconds with a maximum timeout of 30 minutes.
+When `wait_for_ready = true` (the default), the provider polls every **15 seconds** with a maximum timeout of **30 minutes**. If the experiment reaches `failed` status during polling, Terraform returns an error immediately.
 
 ## Import
 
