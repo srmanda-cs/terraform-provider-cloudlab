@@ -1,0 +1,62 @@
+name: Check API Spec
+
+on:
+  schedule:
+    # Run weekly on Mondays at 09:00 UTC
+    - cron: "0 9 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check-api-spec:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch upstream OpenAPI spec
+        run: |
+          curl -fsSL \
+            "https://gitlab.flux.utah.edu/emulab/portal-api/-/raw/master/openapi.json" \
+            -o /tmp/upstream-openapi.json
+
+      - name: Compare specs
+        id: compare
+        run: |
+          jq --sort-keys . api/openapi.json > /tmp/local-sorted.json
+          jq --sort-keys . /tmp/upstream-openapi.json > /tmp/upstream-sorted.json
+          if diff -q /tmp/local-sorted.json /tmp/upstream-sorted.json > /dev/null 2>&1; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Spec is up to date — no changes detected."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Changes detected in upstream spec:"
+            diff /tmp/local-sorted.json /tmp/upstream-sorted.json || true
+          fi
+
+      - name: Update spec and open PR
+        if: steps.compare.outputs.changed == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp /tmp/upstream-openapi.json api/openapi.json
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          BRANCH="chore/api-spec-update-$(date +%Y%m%d)"
+          git checkout -b "$BRANCH"
+          git add api/openapi.json
+          git commit -m "chore(api): update OpenAPI spec from upstream CloudLab portal-api"
+          git push origin "$BRANCH"
+
+          BODY="Automated PR: upstream CloudLab portal-api OpenAPI spec has changed.\n\nReview the diff in \`api/openapi.json\` and update \`internal/provider/\` accordingly.\n\n**Checklist:**\n- Review new/changed paths in the spec\n- Update \`client.go\` structs and methods as needed\n- Update resource/data source schemas and logic\n- Update docs and examples\n- Bump version and publish new release"
+
+          gh pr create \
+            --title "chore(api): update CloudLab OpenAPI spec" \
+            --body "$BODY" \
+            --base main \
+            --head "$BRANCH" || true
