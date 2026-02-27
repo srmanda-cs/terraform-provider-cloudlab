@@ -146,14 +146,14 @@ output "node1_ipv4" {
 
 - `group` (String) — The project subgroup to instantiate the experiment in. **Forces new resource.**
 - `duration` (Number) — Initial experiment duration in hours. **Forces new resource.**
-- `start_at` (String) — Schedule the experiment to start at a future time (RFC3339 format). **Forces new resource.**
-- `stop_at` (String) — Schedule the experiment to stop at a future time (RFC3339 format). **Forces new resource.**
+- `start_at` (String) — Schedule the experiment to start at a future time (RFC3339 format, e.g. `2026-03-01T02:00:00Z`). Validated at plan time. **Forces new resource.**
+- `stop_at` (String) — Schedule the experiment to stop at a future time (RFC3339 format). Validated at plan time. **Forces new resource.**
 - `paramset_name` (String) — Name of a saved parameter set to apply to the profile. **Forces new resource.**
 - `paramset_owner` (String) — The owner (username) of the parameter set. **Forces new resource.**
-- `bindings` (String) — JSON-encoded parameter bindings to apply to the profile. Mutable: changing this value performs a `PATCH /experiments/{id}` to apply new bindings to the running experiment.
+- `bindings` (String) — JSON-encoded parameter bindings to apply to the profile (must be a valid JSON object, e.g. `jsonencode({n_nodes = 4})`). Validated at plan time. Mutable: changing this value performs a `PATCH /experiments/{id}` to apply new bindings to the running experiment.
 - `refspec` (String) — For repository-backed profiles, optionally specify a `refspec[:hash]` to use instead of the HEAD of the default branch. **Forces new resource.**
 - `sshpubkey` (String) — An additional SSH public key to install on all nodes in the experiment. **Forces new resource.**
-- `expires_at` (String) — The time the experiment should expire (RFC3339 format). Setting or changing this value performs a `PUT /experiments/{id}` to extend (or set) the expiration. Can only be moved later, not earlier, once the experiment is running.
+- `expires_at` (String) — The time the experiment should expire (RFC3339 format). Validated at plan time. Setting or changing this value performs a `PUT /experiments/{id}` to extend (or set) the expiration. Can only be moved later, not earlier, once the experiment is running.
 - `extend_reason` (String) — Optional reason text to include when extending the experiment's lifetime via `expires_at`.
 - `wait_for_ready` (Boolean) — If `true` (default), Terraform blocks until the experiment reaches `ready` status before completing the `apply`. Set to `false` to return immediately after the create request is submitted. The provider polls every 15 seconds with a 30-minute timeout.
 

@@ -123,8 +123,8 @@ resource "cloudlab_resgroup" "powder_full" {
 ### Optional
 
 - `group` (String) — The project subgroup for this reservation group. **Forces new resource.**
-- `start_at` (String) — The time the reservation should start (RFC3339 format). If omitted, the reservation starts immediately. Mutable until the reservation is approved.
-- `expires_at` (String) — The time the reservation expires (RFC3339 format). Mutually exclusive with `duration`. Mutable: once approved, can only be moved earlier, not later.
+- `start_at` (String) — The time the reservation should start (RFC3339 format, e.g. `2026-03-15T08:00:00Z`). Validated at plan time. If omitted, the reservation starts immediately. Mutable until the reservation is approved.
+- `expires_at` (String) — The time the reservation expires (RFC3339 format). Validated at plan time. Mutually exclusive with `duration`. Mutable: once approved, can only be moved earlier, not later.
 - `duration` (Number) — Duration of the reservation in hours, as an alternative to `expires_at`. Passed as a query parameter on create/update.
 - `powder_zones` (String) — Powder zone for radio resource reservations. Valid values: `Outdoor`, `Indoor OTA Lab`, `Flux`. Only applicable on the Powder/WIRELESS testbed.
 - `node_types` (List of Object) — Node type reservations. Each entry has:
