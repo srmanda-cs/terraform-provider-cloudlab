@@ -115,6 +115,9 @@ func (p *cloudlabProvider) DataSources(_ context.Context) []func() datasource.Da
 	return []func() datasource.DataSource{
 		NewExperimentDataSource,
 		NewManifestDataSource,
+		NewProfileDataSource,
+		NewResgroupDataSource,
+		NewNodeDataSource,
 	}
 }
 
@@ -124,5 +127,7 @@ func (p *cloudlabProvider) Resources(_ context.Context) []func() resource.Resour
 		NewExperimentResource,
 		NewProfileResource,
 		NewResgroupResource,
+		NewVlanConnectionResource,
+		NewSnapshotResource,
 	}
 }
