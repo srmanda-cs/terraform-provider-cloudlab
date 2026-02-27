@@ -1,0 +1,31 @@
+# Terraform files
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+terraform.tfvars
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Go build artifacts
+terraform-provider-cloudlab
+*.exe
+
+# Go test cache
+*.test
+coverage.out
+coverage.html
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Release artifacts
+dist/
