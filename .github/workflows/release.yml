@@ -30,14 +30,6 @@ jobs:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.PASSPHRASE }}
 
-      - name: Configure GPG agent for loopback pinentry
-        run: |
-          mkdir -p ~/.gnupg
-          chmod 700 ~/.gnupg
-          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
-          gpgconf --kill gpg-agent
-          gpgconf --launch gpg-agent
-
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
@@ -45,3 +37,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
+          GPG_TTY: ""
