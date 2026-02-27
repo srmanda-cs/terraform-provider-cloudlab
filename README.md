@@ -4,8 +4,6 @@
 
 The **CloudLab Terraform Provider** allows [Terraform](https://terraform.io) to manage resources on [CloudLab](https://www.cloudlab.us/) — the academic cloud and network testbed operated by the University of Utah, Clemson University, and the University of Wisconsin.
 
-> **Status:** Under active development. Not yet published to the HashiCorp Registry.
-
 ## Requirements
 
 - [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.0
@@ -50,9 +48,31 @@ resource "cloudlab_experiment" "cluster" {
   duration        = 24
 }
 
-# Access node hostnames/IPs
-output "nodes" {
-  value = cloudlab_experiment.cluster.nodes
+output "experiment_id" {
+  value = cloudlab_experiment.cluster.id
+}
+
+output "experiment_status" {
+  value = cloudlab_experiment.cluster.status
+}
+
+# Look up hostnames/IPs via manifest
+data "cloudlab_manifest" "nodes" {
+  experiment_id = cloudlab_experiment.cluster.id
+}
+
+# Or look up a specific node directly
+data "cloudlab_node" "node1" {
+  experiment_id = cloudlab_experiment.cluster.id
+  client_id     = "node1"
+}
+
+output "node1_hostname" {
+  value = data.cloudlab_node.node1.hostname
+}
+
+output "node1_ipv4" {
+  value = data.cloudlab_node.node1.ipv4
 }
 ```
 
@@ -60,16 +80,46 @@ output "nodes" {
 
 | Resource | Description |
 |----------|-------------|
-| `cloudlab_experiment` | Provisions a set of machines on CloudLab |
+| `cloudlab_experiment` | Provisions a set of machines on CloudLab using a profile |
 | `cloudlab_profile` | Manages experiment profiles (topology templates) |
-| `cloudlab_resgroup` | Manages hardware reservation groups |
+| `cloudlab_resgroup` | Manages hardware reservation groups (pre-reserve nodes) |
+| `cloudlab_vlan_connection` | Connects shared VLANs between two running experiments |
+| `cloudlab_snapshot` | Takes a disk image snapshot of a node in a running experiment |
 
 ## Data Sources
 
 | Data Source | Description |
 |-------------|-------------|
-| `cloudlab_experiment` | Queries a running experiment by name or ID |
+| `cloudlab_experiment` | Queries a running experiment by ID |
 | `cloudlab_manifest` | Retrieves node hostnames and IPs from a running experiment |
+| `cloudlab_profile` | Queries an existing profile by UUID or `project,name` |
+| `cloudlab_resgroup` | Queries an existing reservation group by UUID |
+| `cloudlab_node` | Queries a specific node in a running experiment |
+
+## Notable Features
+
+### Experiment Management
+- Create experiments from any profile with optional `group`, `paramset_name`/`paramset_owner`, `bindings` (JSON), `refspec`, and `sshpubkey`
+- **Extend lifetime** in-place by updating `expires_at` (no destroy/recreate needed)
+- **Modify bindings** in-place via PATCH
+- `wait_for_ready` (default `true`) polls until the experiment reaches `ready` status
+
+### Profile Management
+- Create profiles from inline geni-lib Python `script` or a `repository_url`
+- **Update `script`, `public`, `project_writable`** in-place without replacement
+- Trigger repository pull for repo-backed profiles
+
+### Reservation Groups
+- Reserve hardware nodes by aggregate URN and node type
+- Support for frequency range reservations (Powder/WIRELESS testbed)
+- Support for named route reservations
+- Powder zone selection (`Outdoor`, `Indoor OTA Lab`, `Flux`)
+- **Update** reason, timing, and reservations in-place
+
+### Node Operations
+The client supports all node-level operations exposed by the API:
+- Bulk: reboot, reload, start, stop, power cycle all nodes
+- Per-node: reboot, reload, start, stop, power cycle individual nodes
 
 ## Development
 
@@ -77,7 +127,27 @@ output "nodes" {
 git clone https://github.com/srmanda-cs/terraform-provider-cloudlab.git
 cd terraform-provider-cloudlab
 go build ./...
-go test ./...
+go vet ./...
+golangci-lint run ./...
+```
+
+### Local Provider Override
+
+Add to `~/.terraformrc`:
+
+```hcl
+provider_installation {
+  dev_overrides {
+    "srmanda-cs/cloudlab" = "/path/to/cloudlab-terraform-provider"
+  }
+  direct {}
+}
+```
+
+Then build and use:
+
+```bash
+go build -o terraform-provider-cloudlab
 ```
 
 ## License
