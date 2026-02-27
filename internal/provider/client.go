@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	defaultPortalURL = "https://www.cloudlab.us"
+	defaultPortalURL = "https://boss.emulab.net:43794"
 	apiBasePath      = "/portal/api"
 
 	// Poll intervals for experiment readiness.
